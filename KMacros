@@ -1,0 +1,421 @@
+%define apply 'apply'		; Used with 'count'. Uses the value already in cx for counting
+%define string 'string'
+%define number 'number'
+%define multi 'multi'		; Multidata refers to arrays and data structures
+%define error 'error'
+
+; ========================================================================================================================
+%macro count 1
+	; This macro takes 1 parameter. It is for counted loops. The passed parameter is the number of times the loop
+	; should be executed. Pass the string "apply" to this macro if cx already contains the loop count. count should be
+	; closed/matched with repeat
+
+	%push count
+
+	%ifidn %1, 'apply'			; If string "apply" was passed to this macro...
+		%assign %$pushed 0		; cx not pushed
+
+		%$count_start:
+			cmp cx, 0
+			je %$count_done
+
+	%elifnidn %1, 'apply'			; Else if not passed the string "apply"...
+		%assign %$pushed 1		; Did we push cx? 1 = Yes
+		push cx				; Push cx on the stack
+		mov cx, %1			; Move the macro parameter into cx
+
+		%$count_start:
+			cmp cx, 0
+			je %$count_done
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+%macro repeat 0
+	; This macro takes no parameter. It is to be used with the "count" macro and should be properly nested.
+
+	%ifctx count					; Assemble only if there's a 'count' loop on the context stack
+		dec cx
+		jmp %$count_start
+
+		%$count_done:
+			%if %$pushed = 1		; Did we push cx
+				pop cx			; If yes then remove it
+			%endif
+		%pop
+
+	%else
+		%error "'repeat' without a matching 'count'. Use 'repeat' to terminate a count loop"
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+%macro break 0
+	; This is used to get out of loops. It "steps" out of a loop to go one step higher in the series of nested loops.
+
+	%ifctx count				; If count is on the context stack...
+		jmp %$count_done		; We're jumping out of a count loop
+	%elifctx while				; If while is on the context stack...
+		jmp %$while_done		; We're jumping out of a while loop
+	%elifctx if				; If if is on the context stack...
+		jmp %$if_done			; We're jumping out of an if block
+	%elifctx otherwise			; If otherwise is on the context stack
+		jmp %$if_done			; We're jumping out of an otherwise/else sub-block
+	%else					; Otherwise we're not in a loop/block. Which is an error
+		%error "'break' can only be used in a count loop, a while loop or in an if block"
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+%macro escape 1
+	; This macro is used for escaping from deeply nested loops. It takes one parameter. It is not normally
+	; supposed to take any parameter, but what can I do? The parameter passed to this macro should be the location of
+	; an escape point which should OBVIOUSLY not be in a loop
+
+	mov sp, bp					; Reset the stack
+	jmp %1						; Jump to the specified escape point	
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifabove 2
+	; This macro takes 2 parameters and executes a block of code if the first parameter is greater than the second one
+
+	%push if			; Push an "if" context
+
+	cmp %1, %2			; Compare the 2 parameters
+	jna %$if_otherwise		; If false, go do the "otherwise" block
+
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifbelow 2
+	; This macro takes 2 parameters and executes a block of code if the first parameter is less than the second one
+
+	%push if			; Push an "if" context
+
+	cmp %1, %2			; Compare the 2 parameters
+	jnb %$if_otherwise		; If condition not met, go do the "otherwise" block			
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifequal 2
+	; This macro takes 2 parameters and executes a block of code if the first parameter is equal to the second parameter
+
+	%push if
+
+	cmp %1, %2
+	jne %$if_otherwise			; Skip "if" go straight to "otherwise"
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifnequal 2
+	; This macro takes 2 parameters and executes a block of code if the 2 parameters are not equal
+
+	%push if
+
+	cmp %1, %2
+	je %$if_otherwise
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifnbelow 2
+	; This executes a block of code if parameter 1 is not less than parameter 2
+
+	%push if
+
+	cmp %1, %2
+	jae %$if_otherwise
+
+%endmacro
+
+; ========================================================================================================================
+%macro ifnabove 2
+	; Executes a block of code if parameter 1 is not greater than parameter 2
+
+	%push if
+
+	cmp %1, %2
+	jbe %$if_otherwise
+
+%endmacro
+
+; ========================================================================================================================
+%macro otherwise 0
+	; This macro takes no parameters. It performs exactly the same function as the 'else' statement in other
+	; programming languages. It is to be used in an "if" block. It executes if the "if" condition is false
+	; :)
+
+	%ifctx if			; Ensure the context on the stack is an 'if'
+		%repl otherwise		; Replace the "if" context on the stack with this one
+
+		jmp %$if_done		; Jump will be made if the "if" part was executed and if_otherwise will be skipped
+
+		%$if_otherwise:
+
+	%else
+		%error "Expected 'if' before 'otherwise'. 'otherwise' performs the same function as 'else' in other languages"
+	%endif 
+
+%endmacro
+
+; ========================================================================================================================
+%macro endif 0
+	; End if is used to close an if block and should be nested.
+
+	%ifctx if			; If the stack-context is still "if", then %$if_otherwise has not been defined
+		%$if_otherwise:		; So define %$if_otherwise
+		%$if_done:		; And also define if_done
+
+		%pop
+
+	%elifctx otherwise		; If endif is preceded immediately by otherwise
+		%$if_done:		; Just define if_done as 'otherwise' would already have defined %$if_otherwise:
+
+		%pop
+
+	%else
+		%error "'endif' without a matching 'if'. Use 'if... otherwise... endif' or 'if... endif'"
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+%macro whileabove 2
+	; This macro takes 2 parameters and executes a block of code as long as the first parameter is greater than
+	; the second. All the "while"s should be closed/terminated with a "wend"
+
+	%push while
+
+	%$while_start:				; Marks the beginning of the while loop
+		cmp %1, %2			; Compare the 2 parameters
+		jna %$while_done		; Once the condition becomes false, then get out of the loop
+
+%endmacro
+
+; ========================================================================================================================
+%macro whilebelow 2
+	; whilebelow executes as long as the first parameter is less than the second parameter
+
+	%push while
+
+	%$while_start:
+		cmp %1, %2
+		jnb %$while_done
+
+%endmacro
+
+; ========================================================================================================================
+%macro whileequal 2
+	; Executes a block of code as long as the 2 values are equal
+
+	%push while
+
+	%$while_start:
+		cmp %1, %2
+		jne %$while_done
+
+%endmacro
+
+; ========================================================================================================================
+%macro whilenequal 2
+	; Executes a block of while the 2 parameters are not equal
+
+	%push while
+
+	%$while_start:
+		cmp %1, %2
+		je %$while_done
+
+%endmacro
+
+; ========================================================================================================================
+%macro whilenabove 2
+	; Executes a block of code as long as the first parameter is not greater than the second
+	; i.e. parameter 1 =< parameter 2
+
+	%push while
+
+	%$while_start:
+		cmp %1, %2
+		jbe %$while_done
+
+%endmacro
+
+; =======================================================================================================================
+%macro whilenbelow 2
+	; Executes a block of code as long as the first parameter is greater than or equal to the second one
+
+	%push while
+
+	%$while_start:
+		cmp %1, %2
+		jae %$while_done
+
+%endmacro
+
+; ========================================================================================================================
+%macro wend 0
+	; Use this to terminate the "while..." loops. It doesn't take any parameters.
+
+	%ifctx while					; Assemble if stack context is 'while'
+		jmp %$while_start			; Jump back to the beginning of the loop
+
+		%$while_done:
+
+		%pop					; Remove "while" from the context stack
+	%else
+		%error "'wend' without a matching 'while'. Use 'wend' to terminate a 'while' loop"
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+
+%macro checkContext 0
+	; This is the checkContext macro and it takes no parameter. It checks the context stack to ensure that there are
+	; no open loops or unclosed blocks. All "ret..." macros should do this first before returning from a routine.
+
+	%ifctx count					; If there's still a count loop on the context stack
+
+		%error "'count' without a matching 'repeat'. Use 'repeat' to terminate count loops"
+
+	%elifctx while					; If there's still a while loop on the context stack
+
+		%error "'while...' without a matching 'wend'. Use 'wend' to terminate while loops" 
+
+	%elifctx if					; If there's still 'if' on the context stack
+
+		%error "'if...' without a matching 'endif'. Use 'endif' to terminate an if block"
+
+	%elifctx otherwise
+
+		%error "'otherwise' without a matching 'endif'. Use 'endif' to terminate an if block"
+
+	%endif
+	
+%endmacro
+
+; ========================================================================================================================
+%macro routine 1
+	; The routine macro is used for defining routines. It takes just 1 parameter which should be the name of the
+	; routine
+
+	%1:
+		push bp				; Always preserve bp
+		sub sp, 0x20			; Space for preserving registers
+		mov bp, sp			; Put sp in bp
+
+%endmacro
+
+; ========================================================================================================================
+%macro return 2
+	; The return macro is for returning from programs. It takes 2 parameters. The first is a keyword which tells the
+	; type of the return value and the second is the actual return value itself. Use retset to return more than 1 value
+	; or more than 1 type
+
+	%ifidn %1, 'error'			; We want to return an error
+		stc				; Set the carry flag if returning an error
+
+		mov sp, bp
+		mov ax, %2			; Error code in ax
+		add sp, 0x20			; Reclaim stack space
+		pop bp				; Restore bp
+
+		ret				; Return to caller
+
+	%elifidn %1, 'number'			; To return a number
+		clc				; Clear the carry flag
+
+		mov sp, bp
+		mov ax, %2			; Return numbers in ax
+		add sp, 0x20			; Reclaim stack space
+		pop bp				; Restore bp
+
+		ret				; Return
+
+	%elifidn %1, 'string'
+		clc				; Clear carry
+		mov sp, bp			; Restore the stack
+		mov si, %2			; Return strings in si
+		add sp, 0x20			; Reclaim stack space
+		pop bp				; Restore bp
+
+		ret				; Return
+
+	%elifidn %1, 'multi'			; "multi" is short for "multidata" which refers to arrays and strucs
+		clc
+		mov sp, bp
+		mov bx, %2			; Return multidata in bx
+		add sp, 0x20
+		pop bp
+
+		ret
+	%else
+		%error "Expected: return type 'error', 'number', 'string', or 'multi'"
+	%endif
+
+%endmacro
+
+; ========================================================================================================================
+%macro retset 2-*
+	; This returns a set of values from a routine. It takes at least 2 parameters. The first parameter is the location
+	; of the set of values and is moved into bx. All others are moved into that memory location
+
+	clc					; Clear the carry flag
+	mov bx, %1				; Move the first parameter into bx
+	%assign %%index 0			; Location to put a parameter = [bx + %%index]
+	%rotate 1				; Rotate parameters
+
+	%rep %0-1				; Repeat the following for all the other parameters
+		mov [bx + %%index], %1		; Move the return value to the appropriate memory location
+		%assign %%index %%index+2	; Now [bx + %%index] should point to next memory location
+		%rotate 1			; Get the next parameter
+	%endrep
+
+	mov sp, bp
+	add sp, 0x20
+	pop bp
+
+	ret
+
+%endmacro
+
+; ========================================================================================================================
+%macro mycall 1-*
+	; This macro is for making calls. If the called function requires a return buffer, then pass the return buffer
+	; manually in di, and the size of the return buffer (in bytes) in cx before using this macro to make the call.
+	; Caller is to preserve all registers. Callee is to preserve bp 
+
+	%if %0=1					; If just 1 parameter was passed to this macro
+		call %1					; Just call the function
+	%else
+
+		%define %%calldestination %1		; Save the call destination before we continue
+
+		%rotate 1				; Rotate to the next parameter
+		mov bx, %1				; Next, is where the parameters should be passed
+		%rotate 1
+		%assign %%index 0			; Initialize this to 0
+
+		%rep %0-2				; For the rest of the parameters
+			mov [bx + %%index], %1		; Write the parameter to the appropriate location
+			%assign %%index %%index+2	; Increment index by 2
+
+			%rotate 1			; Rotate to the next parameter
+		%endrep
+
+		call %%calldestination			; Finally, make the call
+
+	%endif
+	
+%endmacro
+
+; ========================================================================================================================
