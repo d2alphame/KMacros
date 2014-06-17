@@ -320,46 +320,57 @@
 	; The return macro is for returning from programs. It takes 2 parameters. The first is a keyword which tells the
 	; type of the return value and the second is the actual return value itself. Use retset to return more than 1 value
 	; or more than 1 type
-
-	%ifidn %1, 'error'			; We want to return an error
-		stc				; Set the carry flag if returning an error
-
-		mov sp, bp
-		mov ax, %2			; Error code in ax
+	
+	%if %0<2				; If this macro was called with less than 2 parameters
+		mov sp, bp			; Restore sp from bp
 		add sp, 0x20			; Reclaim stack space
-		pop bp				; Restore bp
-
-		ret				; Return to caller
-
-	%elifidn %1, 'number'			; To return a number
-		clc				; Clear the carry flag
-
-		mov sp, bp
-		mov ax, %2			; Return numbers in ax
-		add sp, 0x20			; Reclaim stack space
-		pop bp				; Restore bp
-
-		ret				; Return
-
-	%elifidn %1, 'string'
-		clc				; Clear carry
-		mov sp, bp			; Restore the stack
-		mov si, %2			; Return strings in si
-		add sp, 0x20			; Reclaim stack space
-		pop bp				; Restore bp
-
-		ret				; Return
-
-	%elifidn %1, 'multi'			; "multi" is short for "multidata" which refers to arrays and strucs
-		clc
-		mov sp, bp
-		mov bx, %2			; Return multidata in bx
-		add sp, 0x20
-		pop bp
+		pop bp				; Restore bp from the stack
 
 		ret
+
 	%else
-		%error "Expected: return type 'error', 'number', 'string', or 'multi'"
+
+		%ifidn %1, 'error'			; We want to return an error
+			stc				; Set the carry flag if returning an error
+
+			mov sp, bp
+			mov ax, %2			; Error code in ax
+			add sp, 0x20			; Reclaim stack space
+			pop bp				; Restore bp
+
+			ret				; Return to caller
+
+		%elifidn %1, 'number'			; To return a number
+			clc				; Clear the carry flag
+
+			mov sp, bp
+			mov ax, %2			; Return numbers in ax
+			add sp, 0x20			; Reclaim stack space
+			pop bp				; Restore bp
+
+			ret				; Return
+
+		%elifidn %1, 'string'
+			clc				; Clear carry
+			mov sp, bp			; Restore the stack
+			mov si, %2			; Return strings in si
+			add sp, 0x20			; Reclaim stack space
+			pop bp				; Restore bp
+
+			ret				; Return
+
+		%elifidn %1, 'multi'			; "multi" is short for "multidata" which refers to arrays and strucs
+			clc
+			mov sp, bp
+			mov bx, %2			; Return multidata in bx
+			add sp, 0x20
+			pop bp
+
+			ret
+		%else
+			%error "Expected: return type 'error', 'number', 'string', or 'multi'"
+		%endif
+
 	%endif
 
 %endmacro
