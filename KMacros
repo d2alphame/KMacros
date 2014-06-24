@@ -3,6 +3,8 @@
 %define number 'number'
 %define multi 'multi'		; Multidata refers to arrays and data structures
 %define error 'error'
+%define success 'success'
+%define failure 'failure'
 
 ; ========================================================================================================================
 %macro count 1
@@ -279,7 +281,7 @@
 
 ; ========================================================================================================================
 
-%macro checkContext 0
+%macro exit 0
 	; This is the checkContext macro and it takes no parameter. It checks the context stack to ensure that there are
 	; no open loops or unclosed blocks. All "ret..." macros should do this first before returning from a routine.
 
@@ -367,6 +369,23 @@
 			pop bp
 
 			ret
+			
+		%elifidn %1, 'success'			; If the macro was called with 'success as parameter...
+			clc				; Clear the flag
+			mov sp, bp
+			add sp, 0x20
+			pop bp
+			
+			ret
+			
+		%elifidn %1, 'failure'			; If macro was called with 'failure' as parameter...
+			stc				; Set the carry flag
+			mov sp, bp
+			add sp, 0x20
+			pop bp
+			
+			ret
+			
 		%else
 			%error "Expected: return type 'error', 'number', 'string', or 'multi'"
 		%endif
