@@ -134,7 +134,7 @@
 	%push if
 
 	cmp %1, %2
-	jae %$if_otherwise
+	jb %$if_otherwise
 
 %endmacro
 
@@ -145,7 +145,7 @@
 	%push if
 
 	cmp %1, %2
-	jbe %$if_otherwise
+	ja %$if_otherwise
 
 %endmacro
 
