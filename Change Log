@@ -1,3 +1,10 @@
+10-July-2014
+============
+Made changes to the "whilen..." and "return" macros. Changes made to the "whilen..." macros are analogous to the ones
+that were made to "ifn..." macros. The 'return' macro has been changed so that the carry flag is adjusted
+JUST BEFORE THE RETURN. This is because "add sp, 0x20" will affect the carry flag.
+
+
 04-July-2014
 ============
 Corrected my mistakes in the macros 'ifnbelow' and 'ifnabove'. Corrected the jumps to 'jb ...' and 'ja ...' respectively.
