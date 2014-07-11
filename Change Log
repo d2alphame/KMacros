@@ -1,3 +1,9 @@
+11-July-2014
+============
+Corrected the 'retset' macro. Moved the 'clc' instruction just before the 'ret' instruction as "add sp, 0x20" will
+affect the carry flag
+
+
 10-July-2014
 ============
 Made changes to the "whilen..." and "return" macros. Changes made to the "whilen..." macros are analogous to the ones
