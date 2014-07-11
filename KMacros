@@ -403,7 +403,6 @@
 	; This returns a set of values from a routine. It takes at least 2 parameters. The first parameter is the location
 	; of the set of values and is moved into bx. All others are moved into that memory location
 
-	clc					; Clear the carry flag
 	mov bx, %1				; Move the first parameter into bx
 	%assign %%index 0			; Location to put a parameter = [bx + %%index]
 	%rotate 1				; Rotate parameters
@@ -417,6 +416,8 @@
 	mov sp, bp
 	add sp, 0x20
 	pop bp
+	
+	clc					; Clear the carry flag
 
 	ret
 
